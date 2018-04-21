@@ -84,8 +84,12 @@ typedef struct block
 /* Global variables */
 /* Pointer to first block */
 static block_t *heap_listp = NULL;
-static block_t *begin = NULL;
-static block_t *end = NULL;
+// static block_t *begin = NULL;
+// static block_t *end = NULL;
+
+//initialize list of begin and end for segragated list
+static block_t *begin[20];
+static block_t *end[20];
 
 /* Function prototypes for internal helper routines */
 static block_t *extend_heap(size_t size);
@@ -116,7 +120,7 @@ static block_t *find_prev(block_t *block);
 static void remove_free_list(block_t* block);
 static void add_free_list(block_t* block);
 bool mm_checkheap(int lineno);
-
+static int blockindex(size_t size);
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 static size_t align(size_t x) {
@@ -134,6 +138,13 @@ bool mm_init(void)
     if (start == (void *)-1) 
     {
         return false;
+    }
+    // initialize the segragated list
+    int i;
+    for(i = 0; i<20; ++i){
+
+        begin[i] = NULL;
+        end[i] = NULL;
     }
 
     start[0] = pack(0, true); // Prologue footer
@@ -416,13 +427,16 @@ static void place(block_t *block, size_t asize)
 static block_t *find_fit(size_t asize)
 {
     block_t *block;
-    
-    if (begin==NULL)
+    int i;
+
+for(i = blockindex(asize); i<=19; ++i){
+
+    if (begin[i]==NULL)
     {
-        return NULL;
+        continue;
     }
 
-    block = begin;
+    block = begin[i];
     
     while (block!= NULL)
     {
@@ -431,10 +445,14 @@ static block_t *find_fit(size_t asize)
             // dbg_printf("Entering find_fit phase correctly\n");
             return block;
         }
-
         block = block->next;
+        if (block == end[i])
+            break;
     }
-    return NULL; 
+    
+}
+
+return NULL; 
 }
 
 /*
@@ -616,23 +634,25 @@ static bool aligned(const void *p) {
 
 static void add_free_list(block_t* block) {
 
-if (begin==NULL && end == NULL)
+    int i = blockindex(get_size(block));
+
+if (begin[i]==NULL && end[i] == NULL)
     {
      block->prev = NULL;
      block->next = NULL;
-     begin = block;
-     end = block;
+     begin[i] = block;
+     end[i] = block;
     }
 
 
-else if(begin && end)
+else if(begin[i] && end[i])
     {
      
-     block->prev = end;
-     end->next = block;
+     block->prev = end[i];
+     end[i]->next = block;
 
      block->next = NULL;
-     end = block;
+     end[i] = block;
 
     }
 
@@ -640,22 +660,24 @@ else if(begin && end)
 
 static void remove_free_list(block_t* block) {
 
-if (begin == block && end == block)
+    int i = blockindex(get_size(block));
+
+if (begin[i] == block && end[i] == block)
     {
-     begin = NULL;
-     end = NULL;
+     begin[i] = NULL;
+     end[i] = NULL;
 
     }
-else if (begin == block)
+else if (begin[i] == block)
     {
-    begin = block->next;
-    begin->prev = NULL;
+    begin[i] = block->next;
+    begin[i]->prev = NULL;
     }
 
-else if (end == block)
+else if (end[i] == block)
     {
-    end = block->prev;
-    end->next = NULL;
+    end[i] = block->prev;
+    end[i]->next = NULL;
     }
 
 else
@@ -664,4 +686,14 @@ else
      block->next->prev = block->prev;
     }
 
+}
+
+static int blockindex(size_t size){
+    int i =0;
+    unsigned int comp = 32;
+    while(i<19 && comp < size){
+        ++i;
+        comp= comp<< 1;
+    }
+return i;
 }
