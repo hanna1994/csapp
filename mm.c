@@ -1,12 +1,38 @@
 
 /*
  * mm.c
- *
-  * ID: hanw3
+ * ID: hanw3
  * Name: Han Wang
+ * Overview of my code:
 
- * NOTE TO STUDENTS: Replace this header comment with your own header
- * comment that gives a high level description of your solution.
+ In my malloc optimazation, I used segeragated list to store 
+ the free blocks. I split the free block lists into 19 different
+ lists. Each list should contain free blocks with certain size.Particularly,
+ I spilt my segragated lists as [[32,64),[64,128), [128,256),
+ [256,512)...[2^n,2^(n+1))...[2^23,infinity)]. As for the block data structure,
+ I used two pointer prev and next to indicate in the free segragated list, where
+ is the block's prev and next block.But for allocated block, these two pointers
+ are not exsisted. So I used union to store the payload(use when allocated) and these
+ two pointers(use when free).
+
+In addition, I stored three global variables: blockpointer, begin[], end[].
+The blockpointer is a pointer point to current heap's last block(not incldude Prologue footer
+and Epilogue header). The begin and end list used to store the first block and last block in
+each of the 19 segeragated lists I mentioned above. So the begin and end length are the same as
+the number of segragated lists--19. 
+
+As for the strategy of malloc, each time a new free block needs to be added in the corresponding
+free list, I search for the correct list based on the size of the block and store it at the end
+of the list.Each time when I want to take a free block out and allocate it, I search for the 
+corresponding free list based on the size of the allocated size and from the beginning of the
+list and return the right one, if I cannot find one in current list, I search for the consecutive
+next free list which store bigger blocks. So my strategy is first fit and FIFO(first in first out).
+
+And as for the coalescing strategy, I used 
+
+
+
+
  */
 #include <assert.h>
 #include <stdio.h>
@@ -23,7 +49,7 @@
  * If you want debugging output, uncomment the following.  Be sure not
  * to have debugging enabled in your final submission
  */
- #define DEBUG
+ //#define DEBUG
 
 #ifdef DEBUG
 /* When debugging is enabled, the underlying functions get called */
@@ -184,7 +210,8 @@ void *malloc(size_t size)
     }
    dbg_printf("initial asked size is %lu! \n",(word_t)size);
     // Adjust block size to include overhead and to meet alignment requirements
-    asize = round_up(size, dsize) + wsize;
+    asize = round_up(size+wsize, dsize);
+    asize = max(asize, min_block_size);
     dbg_printf("processed asize is %lu! \n",(word_t)asize);
     // Search the free list for a fit
     block = find_fit(asize);
@@ -208,7 +235,7 @@ void *malloc(size_t size)
 
      dbg_printf("Malloc size %zd on address %lu.\n", asize, (word_t)block);
     dbg_ensures(mm_checkheap);
-    mm_checkheap(__LINE__);
+  //  mm_checkheap(__LINE__);
     return bp;
 } 
 
@@ -231,7 +258,7 @@ void free(void *ptr)
     write_footer(block, size, false);
     dbg_printf("Free size %zd on address %lu.\n", size,(word_t)block);
          coalesce(block);
-        mm_checkheap(__LINE__);
+       // mm_checkheap(__LINE__);
 
 
 }
@@ -509,7 +536,7 @@ for(i = blockindex(asize); i<=18; ++i){
     
     while (block!= NULL)
     {
-         mm_checkheap(__LINE__);
+       //  mm_checkheap(__LINE__);
         if (asize <= get_size(block))
         {
             dbg_printf("Entering find_fit phase correctly\n");
@@ -596,7 +623,7 @@ static size_t get_size(block_t *block)
 static word_t get_payload_size(block_t *block)
 {
     size_t asize = get_size(block);
-    return asize - dsize;
+    return asize - wsize;
 }
 
 /*
